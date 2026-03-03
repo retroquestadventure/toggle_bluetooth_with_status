@@ -10,16 +10,17 @@ End If
 Dim regPath
 regPath = "HKLM\SYSTEM\CurrentControlSet\Services\bthserv\Parameters\RadioSupport"
 
-' --- FUNKTION: STATUS LESEN ---
+' --- FUNKTION: STATUS LESEN ODER INITIAL ERSTELLEN ---
 Function GetBTStatus()
     On Error Resume Next
-    statusValue = WshShell.RegRead(regPath)
+    Dim val
+    val = WshShell.RegRead(regPath)
     If Err.Number <> 0 Then
+        Err.Clear
         WshShell.RegWrite regPath, 1, "REG_DWORD"
         GetBTStatus = "AN"
-        Err.Clear
     Else
-        If statusValue = 1 Then GetBTStatus = "AN" Else GetBTStatus = "AUS"
+        If val = 1 Then GetBTStatus = "AN" Else GetBTStatus = "AUS"
     End If
 End Function
 
@@ -28,34 +29,38 @@ currentStatus = GetBTStatus()
 
 If currentStatus = "AN" Then
     msg = "Bluetooth ist AKTIVIERT. Ausschalten?"
-    newStatusValue = 0 ' Zielwert für Registry nach dem Umschalten
+    newStatusValue = 0 
 Else
     msg = "Bluetooth ist DEAKTIVIERT. Einschalten?"
-    newStatusValue = 1 ' Zielwert für Registry nach dem Umschalten
+    newStatusValue = 1 
 End If
 
-ans = MsgBox(msg, 36, "Bluetooth Manager (Sync-Mode)")
+ans = MsgBox(msg, 36, "Bluetooth Manager")
 
 If ans = 6 Then
-    ' 1. Einstellungen öffnen und umschalten
+    ' --- FENSTER-RESET ---
+    ' Beendet alle Instanzen der Einstellungen, damit wir bei "Null" starten
+    WshShell.Run "taskkill /F /IM SystemSettings.exe", 0, True
+    WScript.Sleep 500 ' Kurze Pause zum Schließen
+    
+    ' 1. Einstellungen frisch öffnen
     WshShell.Run "ms-settings:bluetooth"
     WScript.Sleep 2500 
     
+    ' Deine 4 TABs (jetzt auf sicherem Boden)
     WshShell.SendKeys "{TAB}"
     WScript.Sleep 200
     WshShell.SendKeys "{TAB}"
     WScript.Sleep 200
-	WshShell.SendKeys "{TAB}"
+    WshShell.SendKeys "{TAB}"
     WScript.Sleep 200
-	WshShell.SendKeys "{TAB}"
+    WshShell.SendKeys "{TAB}"
     WScript.Sleep 200
+    
     WshShell.SendKeys " "
     WScript.Sleep 1000
     WshShell.SendKeys "%{F4}"
     
-    ' 2. Registry manuell aktualisieren, damit der Status sofort stimmt
+    ' 2. Registry synchronisieren
     WshShell.RegWrite regPath, newStatusValue, "REG_DWORD"
-    
-    ' Optional: Kurze Bestätigung
-    ' MsgBox "Status in Registry aktualisiert!", 64, "Info"
 End If
